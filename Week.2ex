@@ -1,0 +1,230 @@
+
+
+
+ Task 1: Setup & Hello World
+1. Initialize and install dependencies:
+bash
+Copy
+Edit
+mkdir plp_products_api && cd plp_products_api
+npm init -y
+npm install express body-parser uuid
+2. Create server.js:
+js
+Copy
+Edit
+const express = require('express');
+const bodyParser = require('body-parser');
+const productRouter = require('./routes/products');
+const { logger, authenticate, errorHandler, notFoundHandler } = require('./middleware');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Task 3: Middleware
+app.use(logger);
+app.use(bodyParser.json());
+app.use(authenticate);
+
+// Task 1: Basic route
+app.get('/', (req, res) => res.send('Hello World!'));
+
+// Task 2: Use products router
+app.use('/api/products', productRouter);
+
+// Task 4: Error handling
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+📦 Task 2: RESTful Routes for Products
+File: routes/products.js
+js
+Copy
+Edit
+const express = require('express');
+const { v4: uuidv4 } = require('uuid');
+const { validateProduct } = require('../middleware');
+const router = express.Router();
+
+let products = [];
+
+// GET all, with filtering, pagination, search
+router.get('/', (req, res) => {
+  let { category, page = 1, limit = 5, search } = req.query;
+  let results = products;
+
+  if (category) results = results.filter(p => p.category === category);
+  if (search) results = results.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase()));
+
+  const startIdx = (page - 1) * limit;
+  const paged = results.slice(startIdx, startIdx + +limit);
+
+  res.json({
+    page: +page,
+    limit: +limit,
+    total: results.length,
+    data: paged
+  });
+});
+
+// GET by ID
+router.get('/:id', (req, res, next) => {
+  const prod = products.find(p => p.id === req.params.id);
+  if (!prod) return next(createError(404, 'Product not found'));
+  res.json(prod);
+});
+
+// POST new product
+router.post('/', validateProduct, (req, res) => {
+  const newProd = { id: uuidv4(), ...req.body };
+  products.push(newProd);
+  res.status(201).json(newProd);
+});
+
+// PUT update product
+router.put('/:id', validateProduct, (req, res, next) => {
+  const idx = products.findIndex(p => p.id === req.params.id);
+  if (idx < 0) return next(createError(404, 'Product not found'));
+  products[idx] = { id: req.params.id, ...req.body };
+  res.json(products[idx]);
+});
+
+// DELETE product
+router.delete('/:id', (req, res, next) => {
+  const idx = products.findIndex(p => p.id === req.params.id);
+  if (idx < 0) return next(createError(404, 'Product not found'));
+  products.splice(idx, 1);
+  res.status(204).end();
+});
+
+module.exports = router;
+🛡️ Task 3: Middleware Implementation
+File: middleware/index.js
+js
+Copy
+Edit
+const createError = require('http-errors');
+
+// Logger middleware
+function logger(req, res, next) {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.originalUrl}`);
+  next();
+}
+
+// Auth middleware
+function authenticate(req, res, next) {
+  const key = req.headers['x-api-key'];
+  if (!key || key !== process.env.API_KEY) {
+    return next(createError(401, 'Unauthorized'));
+  }
+  next();
+}
+
+// Validation middleware
+function validateProduct(req, res, next) {
+  const { name, description, price, category, inStock } = req.body;
+  if (
+    typeof name !== 'string' ||
+    typeof description !== 'string' ||
+    typeof price !== 'number' ||
+    typeof category !== 'string' ||
+    typeof inStock !== 'boolean'
+  ) {
+    return next(createError(400, 'Invalid product data'));
+  }
+  next();
+}
+
+// 404 handler
+function notFoundHandler(req, res, next) {
+  next(createError(404, 'Not Found'));
+}
+
+// Global error handler
+function errorHandler(err, req, res, next) {
+  console.error(err);
+  res.status(err.status || 500).json({
+    status: err.status || 500,
+    message: err.message
+  });
+}
+
+module.exports = {
+  logger,
+  authenticate,
+  validateProduct,
+  notFoundHandler,
+  errorHandler
+};
+🔍 Task 4: Error Handling Explained
+Custom errors are created via http-errors (createError(404, '...')).
+
+validatorProduct throws a 400 error when required fields fail validation.
+
+404 and global error handlers ensure consistent structured error JSON responses 
+en.wikipedia.org
++7
+stackoverflow.com
++7
+toptal.com
++7
+.
+
+💡 Task 5: Advanced Features
+Implemented in /api/products:
+
+Filtering: ?category=electronics
+
+Pagination: ?page=2&limit=5
+
+Search: ?search=phone
+
+Stats: Here's how you add product stats:
+
+js
+Copy
+Edit
+router.get('/stats', (req, res) => {
+  const byCat = products.reduce((acc, p) => {
+    acc[p.category] = (acc[p.category] || 0) + 1;
+    return acc;
+  }, {});
+  res.json(byCat);
+});
+📄 README.md Outline
+md
+Copy
+Edit
+# PLP Products API
+
+## Setup
+1. Clone the repo
+2. Create `.env` with `API_KEY=yourkey`
+3. `npm install`
+4. `npm start`
+
+## Endpoints
+- `GET /`: Hello World
+- `GET /api/products`: List products (filters: `category`, `search`, pagination)
+- `GET /api/products/:id`: Single product
+- `POST /api/products`: Create product (JSON body)
+- `PUT /api/products/:id`: Update product
+- `DELETE /api/products/:id`: Remove product
+- `GET /api/products/stats`: Return counts grouped by category
+
+## Error Handling
+Returns JSON:
+```json
+{ "status": 404, "message": "Not Found" }
+Use POSTMAN or curl to test.
+
+yaml
+Copy
+Edit
+
+---
+
+This structure satisfies **all tasks**: setup, REST routes, middleware, error handling, filtering/pagination/search, and stats. ✨ Let me know if you’d like help with GitHub integration, environment variables, tests, or deploying!
+::contentReference[oaicite:5]{index=5}
